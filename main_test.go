@@ -1,41 +1,85 @@
 package main_test
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 
+	"github.com/nu7hatch/gouuid"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
 )
 
+var context struct {
+	cfDomain   string
+	cfUsername string
+	cfPassword string
+	cfHome     string
+}
+
 var _ = BeforeSuite(func() {
-	uninstallCommand := exec.Command("cf", "uninstall-plugin", "Watch")
-	session, err := gexec.Start(uninstallCommand, GinkgoWriter, GinkgoWriter)
+	context.cfDomain = loadEnv("CF_DOMAIN")
+	context.cfUsername = loadEnv("CF_USERNAME")
+	context.cfPassword = loadEnv("CF_PASSWORD")
+
+	var err error
+	context.cfHome, err = ioutil.TempDir("", "cf-watch")
 	Expect(err).NotTo(HaveOccurred())
-	Eventually(session).Should(gexec.Exit())
+	os.Setenv("CF_HOME", context.cfHome)
+	os.Setenv("CF_PLUGIN_HOME", filepath.Join(context.cfHome, "plugins"))
 
 	pluginPath, err := gexec.Build("github.com/sclevine/cf-watch")
 	Expect(err).NotTo(HaveOccurred())
-	installCommand := exec.Command("cf", "install-plugin", "-f", pluginPath)
-	session, err = gexec.Start(installCommand, GinkgoWriter, GinkgoWriter)
-	Expect(err).NotTo(HaveOccurred())
-	Eventually(session).Should(gexec.Exit(0))
+
+	Eventually(cf("install-plugin", "-f", pluginPath)).Should(gexec.Exit(0))
 })
 
 var _ = AfterSuite(func() {
-	uninstallCommand := exec.Command("cf", "uninstall-plugin", "Watch")
-	session, err := gexec.Start(uninstallCommand, GinkgoWriter, GinkgoWriter)
-	Expect(err).NotTo(HaveOccurred())
-	Eventually(session).Should(gexec.Exit(0))
+	Expect(os.RemoveAll(context.cfHome)).To(Succeed())
 })
 
 var _ = Describe("CF Watch", func() {
-	It("should print watch", func() {
-		watchCommand := exec.Command("cf", "watch")
-		session, err := gexec.Start(watchCommand, GinkgoWriter, GinkgoWriter)
+	var orgName string
+
+	BeforeEach(func() {
+		Eventually(cf("api", "api."+context.cfDomain, "--skip-ssl-validation")).Should(gexec.Exit(0))
+		Eventually(cf("auth", context.cfUsername, context.cfPassword)).Should(gexec.Exit(0))
+		orgUUID, err := uuid.NewV4()
 		Expect(err).NotTo(HaveOccurred())
+		orgName = fmt.Sprint("org-", orgUUID)
+		Eventually(cf("create-org", orgName)).Should(gexec.Exit(0))
+		Eventually(cf("create-space", "test-space", "-o", orgName)).Should(gexec.Exit(0))
+		Eventually(cf("target", "-o", orgName, "-s", "test-space")).Should(gexec.Exit(0))
+		Eventually(cf("push", "test-app", "-p", "fixtures/test-app", "-b", "go_buildpack"), "2m").Should(gexec.Exit(0))
+	})
+
+	AfterEach(func() {
+		Eventually(cf("delete-org", "-f", orgName), "10s").Should(gexec.Exit(0))
+	})
+
+	It("should write a `/tmp/watch` file to the app container", func() {
+		Eventually(cf("watch")).Should(gexec.Exit(0))
+		session := cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch")
 		Eventually(session).Should(gexec.Exit(0))
-		Expect(session).To(gbytes.Say("watch"))
+		Expect(session).To(gbytes.Say("watch file"))
 	})
 })
+
+func loadEnv(name string) string {
+	value := os.Getenv(name)
+	if value == "" {
+		Fail("missing "+name, 1)
+	}
+	return value
+}
+
+func cf(args ...string) *gexec.Session {
+	command := exec.Command("cf", args...)
+	session, err := gexec.Start(command, GinkgoWriter, GinkgoWriter)
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	return session
+}
