@@ -59,12 +59,12 @@ func (*Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 	}
 
 	defer session.Close()
-	sessionIn, err := session.StdinPipe()
-	if err != nil {
-		cliPanic(err)
-	}
 
 	go func() {
+		sessionIn, err := session.StdinPipe()
+		if err != nil {
+			cliPanic(err)
+		}
 		defer sessionIn.Close()
 		content := "watch file\n"
 		fmt.Fprintln(sessionIn, "C0644", len(content), "watch")
