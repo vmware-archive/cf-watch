@@ -32,7 +32,7 @@ var _ = BeforeSuite(func() {
 	os.Setenv("CF_HOME", context.cfHome)
 	os.Setenv("CF_PLUGIN_HOME", filepath.Join(context.cfHome, "plugins"))
 
-	pluginPath, err := gexec.Build("github.com/sclevine/cf-watch")
+	pluginPath, err := gexec.Build("github.com/pivotal-cf/cf-watch")
 	Expect(err).NotTo(HaveOccurred())
 
 	Eventually(cf("install-plugin", "-f", pluginPath)).Should(gexec.Exit(0))

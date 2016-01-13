@@ -1,5 +1,5 @@
 {
-	"ImportPath": "github.com/sclevine/cf-watch",
+	"ImportPath": "github.com/pivotal-cf/cf-watch",
 	"GoVersion": "go1.5",
 	"Packages": [
 		"./..."
@@ -9,6 +9,10 @@
 			"ImportPath": "github.com/cloudfoundry/cli/plugin",
 			"Comment": "v6.14.1-72-g450905f",
 			"Rev": "450905f094c97fbb2bb4e6628396dcfd706957a1"
+		},
+		{
+			"ImportPath": "github.com/nu7hatch/gouuid",
+			"Rev": "179d4d0c4d8d407a32af483c2354df1d2c91e6c3"
 		},
 		{
 			"ImportPath": "github.com/onsi/ginkgo",
