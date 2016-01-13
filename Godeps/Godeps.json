@@ -23,6 +23,14 @@
 			"ImportPath": "github.com/onsi/gomega",
 			"Comment": "v1.0-75-g0fe2044",
 			"Rev": "0fe204460da2c8fa1babcaac196e694de8f1aaa1"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/curve25519",
+			"Rev": "d67eb63455fa4d6fca5802332d86f1f204017e00"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ssh",
+			"Rev": "d67eb63455fa4d6fca5802332d86f1f204017e00"
 		}
 	]
 }
