@@ -1,54 +1,38 @@
 package scp_test
 
 import (
-	"errors"
-	"net"
-	"strings"
-
-	"golang.org/x/crypto/ssh"
-
-	. "github.com/pivotal-cf/cf-watch/scp"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	. "github.com/pivotal-cf/cf-watch/scp"
+	"github.com/pivotal-cf/cf-watch/scp/mocks"
 )
 
 var _ = Describe("Session", func() {
 	var (
-		session   *Session
-		serverURL string
+		session       *Session
+		mockSSHServer *mocks.SSHServer
+		serverAddress string
 	)
 
 	BeforeEach(func() {
 		session = &Session{}
-		serverURL = "0.0.0.0:" + freePort()
-		config := &ssh.ServerConfig{
-			PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-				if c.User() == "some-valid-user" && string(pass) == "some-valid-password" {
-					return nil, nil
-				}
-				return nil, errors.New("some error")
-			},
+		mockSSHServer = &mocks.SSHServer{
+			User:     "some-valid-user",
+			Password: "some-valid-password",
 		}
-		_, err := net.Listen("tcp", serverURL)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(config).NotTo(BeNil())
+		serverAddress = mockSSHServer.Start()
 	})
 
 	Describe("#Connect", func() {
 		It("should dial an SSH session", func() {
-
+			go func() {
+				defer GinkgoRecover()
+				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+				Expect(session.Send()).To(Succeed())
+			}()
+			Expect(<-mockSSHServer.DataChan).To(Equal("test"))
+			Expect(<-mockSSHServer.CommandChan).To(Equal("echo hi"))
 		})
 	})
 })
-
-func freePort() string {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		Fail(err.Error())
-	}
-	defer listener.Close()
-
-	address := listener.Addr().String()
-	return strings.SplitN(address, ":", 2)[1]
-}

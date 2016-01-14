@@ -30,6 +30,7 @@ type Plugin struct {
 
 func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 	var cli CLI = cliConnection
+
 	appGUIDOutput, err := cli.CliCommandWithoutTerminalOutput("app", args[1], "--guid")
 	if err != nil {
 		p.UI.Failed("Failed to retrieve app GUID:", err)

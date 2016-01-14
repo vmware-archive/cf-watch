@@ -51,7 +51,7 @@ var _ = Describe("CF Watch", func() {
 		orgUUID, err := uuid.NewV4()
 		Expect(err).NotTo(HaveOccurred())
 		orgName = fmt.Sprint("org-", orgUUID)
-		Eventually(cf("create-org", orgName)).Should(gexec.Exit(0))
+		Eventually(cf("create-org", orgName), "2s").Should(gexec.Exit(0))
 		Eventually(cf("create-space", "test-space", "-o", orgName)).Should(gexec.Exit(0))
 		Eventually(cf("target", "-o", orgName, "-s", "test-space")).Should(gexec.Exit(0))
 		Eventually(cf("push", "test-app", "-p", "fixtures/test-app", "-b", "go_buildpack", "--no-route"), "2m").Should(gexec.Exit(0))
@@ -62,7 +62,7 @@ var _ = Describe("CF Watch", func() {
 	})
 
 	It("should write a `/tmp/watch` file to the app container", func() {
-		Eventually(cf("watch", "test-app")).Should(gexec.Exit(0))
+		Eventually(cf("watch", "test-app"), "2s").Should(gexec.Exit(0))
 		session := cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch")
 		Eventually(session).Should(gexec.Exit(0))
 		Expect(session).To(gbytes.Say("watch file"))
