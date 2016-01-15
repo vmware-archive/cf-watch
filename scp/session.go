@@ -2,6 +2,9 @@ package scp
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -29,17 +32,42 @@ func (s *Session) Connect(endpoint, username, password string) error {
 	return nil
 }
 
-func (s *Session) Send() error {
+func (s *Session) Close() error {
+	return s.client.Close()
+}
+
+func (s *Session) Send(path string, contents io.ReadCloser, mode os.FileMode, size int64) error {
 	session, err := s.client.NewSession()
+	if err != nil {
+		return err
+	}
 	defer session.Close()
+
+	errChan := make(chan error, 1)
 	go func() {
 		stdin, err := session.StdinPipe()
 		if err != nil {
-			panic(err)
+			errChan <- err
+			return
 		}
 		defer stdin.Close()
-		fmt.Fprintln(stdin, "test")
+
+		fmt.Fprintf(stdin, "C%04o %d %s\n", mode, size, filepath.Base(path))
+
+		if _, err := io.Copy(stdin, contents); err != nil {
+			errChan <- err
+			return
+		}
+		if _, err := stdin.Write([]byte{0}); err != nil {
+			errChan <- err
+			return
+		}
 	}()
-	session.Run("echo hi")
-	return err
+	go func() {
+		if err := session.Run(fmt.Sprintf("/usr/bin/scp -tr %s", filepath.Dir(path))); err != nil {
+			errChan <- err
+		}
+		close(errChan)
+	}()
+	return <-errChan
 }
