@@ -65,7 +65,7 @@ var _ = Describe("CF Watch", func() {
 		Eventually(cf("watch", "test-app"), "2s").Should(gexec.Exit(0))
 		session := cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch")
 		Eventually(session).Should(gexec.Exit(0))
-		Expect(session).To(gbytes.Say("watch file"))
+		Expect(session).To(gbytes.Say(""))
 	})
 })
 

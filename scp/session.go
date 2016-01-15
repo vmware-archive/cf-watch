@@ -1,6 +1,7 @@
 package scp
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,7 +27,7 @@ func (s *Session) Connect(endpoint, username, password string) error {
 		},
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	return nil
@@ -39,7 +40,7 @@ func (s *Session) Close() error {
 func (s *Session) Send(path string, contents io.ReadCloser, mode os.FileMode, size int64) error {
 	session, err := s.client.NewSession()
 	if err != nil {
-		return err
+		return errors.New("Failed to open session: " + err.Error())
 	}
 	defer session.Close()
 

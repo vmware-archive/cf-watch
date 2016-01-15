@@ -2,6 +2,9 @@ package watch_test
 
 import (
 	"errors"
+	"io/ioutil"
+	"os"
+	"strings"
 
 	cliplugin "github.com/cloudfoundry/cli/plugin"
 	"github.com/golang/mock/gomock"
@@ -46,8 +49,9 @@ var _ = Describe("Plugin", func() {
 	})
 
 	Describe("#Run", func() {
-		It("should connect to the app", func() {
+		It("should connect to the app and send watch file", func() {
 			mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
+			mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), os.FileMode(0644), int64(0)).Return(nil)
 
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
@@ -103,7 +107,7 @@ var _ = Describe("Plugin", func() {
 			})
 		})
 
-		Describe("when the connecting to the app over SSH fails", func() {
+		Describe("when connecting to the app over SSH fails", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
@@ -112,6 +116,21 @@ var _ = Describe("Plugin", func() {
 				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(errors.New("some error"))
 
 				mockUI.EXPECT().Failed("Failed to connect to app over SSH:", errors.New("some error"))
+
+				plugin.Run(mockCLI, []string{"watch", "some-app"})
+			})
+		})
+
+		Describe("when sending the data over ssh fails", func() {
+			It("should output a failure message", func() {
+				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
+				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
+				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{`{"app_ssh_endpoint": "some-endpoint"}` + "\n"}, nil)
+
+				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
+				mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), os.FileMode(0644), int64(0)).Return(errors.New("some error"))
+
+				mockUI.EXPECT().Failed("Failed to send data to app over SSH:", errors.New("some error"))
 
 				plugin.Run(mockCLI, []string{"watch", "some-app"})
 			})

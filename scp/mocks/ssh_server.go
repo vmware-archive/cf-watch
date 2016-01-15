@@ -16,6 +16,7 @@ type SSHServer struct {
 	Password    string
 	CommandChan chan string
 	DataChan    chan string
+	FailCommand bool
 	listener    net.Listener
 }
 
@@ -25,8 +26,8 @@ func (s *SSHServer) Start() (address string) {
 	var err error
 	s.listener, err = net.Listen("tcp", "127.0.0.1:0")
 	Expect(err).NotTo(HaveOccurred())
-	s.CommandChan = make(chan string)
-	s.DataChan = make(chan string)
+	s.CommandChan = make(chan string, 1000)
+	s.DataChan = make(chan string, 1000)
 	go s.listen()
 	return s.listener.Addr().String()
 }
@@ -54,13 +55,18 @@ func (s *SSHServer) listen() {
 
 	for {
 		tcpConn, err := s.listener.Accept()
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			return
+		}
 		_, newChannels, requests, err := ssh.NewServerConn(tcpConn, config)
 		Expect(err).NotTo(HaveOccurred())
 
 		go ssh.DiscardRequests(requests)
 		go func() {
 			for newChannel := range newChannels {
+				if s.listener == nil {
+					return
+				}
 				go s.handleChannel(newChannel)
 			}
 		}()
@@ -75,19 +81,17 @@ func (s *SSHServer) handleChannel(newChannel ssh.NewChannel) {
 	channel, requests, err := newChannel.Accept()
 	defer channel.Close()
 	Expect(err).NotTo(HaveOccurred())
-	go func() {
-		defer GinkgoRecover()
-
-		for request := range requests {
-			Expect(request.Type).To(Equal("exec"))
-			payloadLen := binary.BigEndian.Uint32(request.Payload[:4])
-			Expect(request.Payload).To(HaveLen(int(payloadLen) + 4))
-			Expect(request.Reply(true, nil)).To(Succeed())
-			channel.SendRequest("exit-status", false, []byte{0, 0, 0, 0})
-			s.CommandChan <- string(request.Payload[4:])
-			// move this up ^
-		}
-	}()
+	request := <-requests
+	Expect(request.Type).To(Equal("exec"))
+	payloadLen := binary.BigEndian.Uint32(request.Payload[:4])
+	Expect(request.Payload).To(HaveLen(int(payloadLen) + 4))
+	if s.FailCommand {
+		Expect(request.Reply(false, []byte(""))).To(Succeed())
+	} else {
+		Expect(request.Reply(true, nil)).To(Succeed())
+	}
+	s.CommandChan <- string(request.Payload[4:])
+	channel.SendRequest("exit-status", false, []byte{0, 0, 0, 0})
 	data, err := ioutil.ReadAll(channel)
 	Expect(err).NotTo(HaveOccurred())
 	s.DataChan <- string(data)

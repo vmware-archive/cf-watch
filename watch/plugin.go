@@ -3,6 +3,9 @@ package watch
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/cloudfoundry/cli/plugin"
@@ -11,6 +14,7 @@ import (
 //go:generate mockgen -package mocks -destination mocks/session.go github.com/pivotal-cf/cf-watch/watch Session
 type Session interface {
 	Connect(endpoint, guid, password string) error
+	Send(path string, contents io.ReadCloser, mode os.FileMode, size int64) error
 }
 
 //go:generate mockgen -package mocks -destination mocks/cli.go github.com/pivotal-cf/cf-watch/watch CLI
@@ -65,6 +69,12 @@ func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 		p.UI.Failed("Failed to connect to app over SSH:", err)
 		return
 	}
+
+	if err := p.Session.Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), 0644, 0); err != nil {
+		p.UI.Failed("Failed to send data to app over SSH:", err)
+		return
+	}
+
 }
 
 func (*Plugin) GetMetadata() plugin.PluginMetadata {

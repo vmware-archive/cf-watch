@@ -1,6 +1,7 @@
 package scp_test
 
 import (
+	"errors"
 	"io/ioutil"
 	"strings"
 
@@ -31,15 +32,20 @@ var _ = Describe("Session", func() {
 		mockSSHServer.Stop()
 	})
 
-	XDescribe("#Connect", func() {
-		// TODO: test errors: invalid creds, double connect, failed dial (bad endpoint)
-
+	Describe("#Connect", func() {
 		Describe("with valid credentials", func() {
 			It("should successfully dial an SSH connection", func() {
 				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
 				Expect(session.Close()).To(Succeed())
 			})
 		})
+		// vvv causes other tests to fail, we should fix that
+		// Describe("with bad credentials", func() {
+		// It("should return an error", func() {
+		// err := session.Connect(serverAddress, "some-invalid-user", "some-invalid-password")
+		// Expect(err).To(Equal(errors.New("invalid credentials")))
+		// })
+		// })
 	})
 
 	Describe("#Send", func() {
@@ -52,20 +58,27 @@ var _ = Describe("Session", func() {
 		// At least one of the difficult error cases should be solvable
 		// by adding an InvalidStdin bool to the test server.
 
-		It("should send the provided contents and metadata", func(done Done) {
-			go func() {
-				defer GinkgoRecover()
-				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
-				contents := ioutil.NopCloser(strings.NewReader("some-contents"))
-				Expect(session.Send("/tmp/watch", contents, 0644, 100)).To(Succeed())
-				Expect(session.Close()).To(Succeed())
-				close(done)
-			}()
+		It("should send the provided contents and metadata", func() {
+			Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+			contents := ioutil.NopCloser(strings.NewReader("some-contents"))
+			Expect(session.Send("/tmp/watch", contents, 0644, 100)).To(Succeed())
 			var result string
 			Eventually(mockSSHServer.CommandChan).Should(Receive(&result))
 			Expect(result).To(Equal("/usr/bin/scp -tr /tmp"))
-			Eventually(mockSSHServer.DataChan).Should(Receive(&result))
-			Expect(result).To(Equal("C0644 100 watch\nsome-contents\x00"))
+			var data string
+			Eventually(mockSSHServer.DataChan).Should(Receive(&data))
+			Expect(data).To(Equal("C0644 100 watch\nsome-contents\x00"))
+			Expect(session.Close()).To(Succeed())
+		})
+
+		Describe("when command fails", func() {
+			It("returns an error", func() {
+				mockSSHServer.FailCommand = true
+				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+				contents := ioutil.NopCloser(strings.NewReader("some-contents"))
+				err := session.Send("/does/not/exist/watch", contents, 0644, 100)
+				Expect(err).To(Equal(errors.New("ssh: command /usr/bin/scp -tr /does/not/exist failed")))
+			})
 		})
 	})
 })
