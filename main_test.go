@@ -54,7 +54,7 @@ var _ = Describe("CF Watch", func() {
 		Eventually(cf("create-org", orgName), "2s").Should(gexec.Exit(0))
 		Eventually(cf("create-space", "test-space", "-o", orgName)).Should(gexec.Exit(0))
 		Eventually(cf("target", "-o", orgName, "-s", "test-space")).Should(gexec.Exit(0))
-		Eventually(cf("push", "test-app", "-p", "fixtures/test-app", "-b", "go_buildpack", "--no-route"), "2m").Should(gexec.Exit(0))
+		Eventually(cf("push", "test-app", "-p", "fixtures/test-app", "-b", "go_buildpack", "--no-route", "-i", "2"), "2m").Should(gexec.Exit(0))
 	})
 
 	AfterEach(func() {
@@ -63,7 +63,10 @@ var _ = Describe("CF Watch", func() {
 
 	It("should write a `/tmp/watch` file to the app container", func() {
 		Eventually(cf("watch", "test-app"), "2s").Should(gexec.Exit(0))
-		session := cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch")
+		session := cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch", "-i", "0")
+		Eventually(session).Should(gexec.Exit(0))
+		Expect(session).To(gbytes.Say(""))
+		session = cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch", "-i", "1")
 		Eventually(session).Should(gexec.Exit(0))
 		Expect(session).To(gbytes.Say(""))
 	})

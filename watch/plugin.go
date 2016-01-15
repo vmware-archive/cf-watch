@@ -41,14 +41,23 @@ func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 		return
 	}
 	appGUID := strings.TrimSpace(appGUIDOutput[0])
-	username := fmt.Sprintf("cf:%s/0", appGUID)
 
-	passwordOutput, err := cli.CliCommandWithoutTerminalOutput("ssh-code")
+	appJSONOutput, err := cli.CliCommandWithoutTerminalOutput("curl", "/v2/apps/"+appGUID)
 	if err != nil {
-		p.UI.Failed("Failed to retrieve SSH code:", err)
+		p.UI.Failed("Failed to retrieve app info:", err)
 		return
 	}
-	password := strings.TrimSpace(passwordOutput[0])
+
+	var appInfo struct {
+		Entity struct {
+			Instances int `json:"instances"`
+		} `json:"entity"`
+	}
+
+	if err := json.Unmarshal([]byte(appJSONOutput[0]), &appInfo); err != nil {
+		p.UI.Failed("Failed to parse app info JSON:", err)
+		return
+	}
 
 	infoJSONOutput, err := cli.CliCommandWithoutTerminalOutput("curl", "/v2/info")
 	if err != nil {
@@ -65,16 +74,26 @@ func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 		return
 	}
 
-	if err := p.Session.Connect(info.AppSSHEndpoint, username, password); err != nil {
-		p.UI.Failed("Failed to connect to app over SSH:", err)
-		return
-	}
+	for i := range make([]int, appInfo.Entity.Instances, appInfo.Entity.Instances) {
+		username := fmt.Sprintf("cf:%s/%d", appGUID, i)
 
-	if err := p.Session.Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), 0644, 0); err != nil {
-		p.UI.Failed("Failed to send data to app over SSH:", err)
-		return
-	}
+		passwordOutput, err := cli.CliCommandWithoutTerminalOutput("ssh-code")
+		if err != nil {
+			p.UI.Failed("Failed to retrieve SSH code:", err)
+			return
+		}
+		password := strings.TrimSpace(passwordOutput[0])
 
+		if err := p.Session.Connect(info.AppSSHEndpoint, username, password); err != nil {
+			p.UI.Failed("Failed to connect to app over SSH:", err)
+			return
+		}
+
+		if err := p.Session.Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), 0644, 0); err != nil {
+			p.UI.Failed("Failed to send data to app over SSH:", err)
+			return
+		}
+	}
 }
 
 func (*Plugin) GetMetadata() plugin.PluginMetadata {
