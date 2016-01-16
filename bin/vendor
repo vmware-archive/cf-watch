@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cf_watch_dir=$(cd `dirname $0` && cd .. && pwd)
+
+go get -u github.com/tools/godep
+
+pushd "$cf_watch_dir" >/dev/null
+  godep restore
+  godep save -t $(go list ./... | grep -Ev '/vendor/|/fixtures/')
+popd >/dev/null

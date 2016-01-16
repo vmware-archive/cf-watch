@@ -2,13 +2,40 @@
 	"ImportPath": "github.com/pivotal-cf/cf-watch",
 	"GoVersion": "go1.5",
 	"Packages": [
-		"./..."
+		"github.com/pivotal-cf/cf-watch",
+		"github.com/pivotal-cf/cf-watch/scp",
+		"github.com/pivotal-cf/cf-watch/scp/mocks",
+		"github.com/pivotal-cf/cf-watch/watch",
+		"github.com/pivotal-cf/cf-watch/watch/mocks"
 	],
 	"Deps": [
+		{
+			"ImportPath": "github.com/blang/semver",
+			"Comment": "v3.1.0",
+			"Rev": "aea32c919a18e5ef4537bbd283ff29594b1b0165"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/cli/cf",
+			"Comment": "v6.14.1-72-g450905f",
+			"Rev": "450905f094c97fbb2bb4e6628396dcfd706957a1"
+		},
 		{
 			"ImportPath": "github.com/cloudfoundry/cli/plugin",
 			"Comment": "v6.14.1-72-g450905f",
 			"Rev": "450905f094c97fbb2bb4e6628396dcfd706957a1"
+		},
+		{
+			"ImportPath": "github.com/cloudfoundry/gofileutils/fileutils",
+			"Rev": "b9aba8bc5b91f0764131fcac8ea0ff2dd202c8c4"
+		},
+		{
+			"ImportPath": "github.com/golang/mock/gomock",
+			"Rev": "58a501f87109a45c68afc54e6b1368398678d386"
+		},
+		{
+			"ImportPath": "github.com/nicksnyder/go-i18n/i18n",
+			"Comment": "v1.4.0",
+			"Rev": "37e5c2de3e03e4b82693e3fcb4a6aa2cc4eb07e3"
 		},
 		{
 			"ImportPath": "github.com/nu7hatch/gouuid",
@@ -31,6 +58,10 @@
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
 			"Rev": "d67eb63455fa4d6fca5802332d86f1f204017e00"
+		},
+		{
+			"ImportPath": "gopkg.in/yaml.v2",
+			"Rev": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4"
 		}
 	]
 }
