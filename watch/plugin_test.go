@@ -49,9 +49,9 @@ var _ = Describe("Plugin", func() {
 	})
 
 	Describe("#Run", func() {
-		It("should connect to the app and send watch file", func() {
+		It("should connect to the app and send a /tmp/watch file", func() {
 			mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
-			mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), os.FileMode(0644), int64(0)).Return(nil)
+			mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("test")), os.FileMode(0644), int64(4)).Return(nil)
 
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
@@ -61,48 +61,33 @@ var _ = Describe("Plugin", func() {
 			plugin.Run(mockCLI, []string{"watch", "some-app"})
 		})
 
-		Describe("when there are multiple instances of the app", func() {
-			It("should connect to each app and send watch file", func() {
-				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
-				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/1", "some-password").Return(nil)
-				mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), os.FileMode(0644), int64(0)).Return(nil).Times(2)
-
-				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
-				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 2}}` + "\n"}, nil)
-				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{`{"app_ssh_endpoint": "some-endpoint"}` + "\n"}, nil)
-				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil).Times(2)
-
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
-			})
-		})
-
-		Describe("when the app GUID is unavailabe", func() {
+		Context("when the app GUID is unavailable", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return(nil, errors.New("some error"))
 
-				mockUI.EXPECT().Failed("Failed to retrieve app GUID:", errors.New("some error"))
+				mockUI.EXPECT().Failed("Failed to retrieve app GUID: %s", errors.New("some error"))
 
 				plugin.Run(mockCLI, []string{"watch", "some-app"})
 			})
 		})
 
-		Describe("when the app info is unavailabe", func() {
+		Context("when the app info is unavailabe", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return(nil, errors.New("some error"))
 
-				mockUI.EXPECT().Failed("Failed to retrieve app info:", errors.New("some error"))
+				mockUI.EXPECT().Failed("Failed to retrieve app info: %s", errors.New("some error"))
 
 				plugin.Run(mockCLI, []string{"watch", "some-app"})
 			})
 		})
 
-		Describe("when the app info is unavailabe", func() {
+		Context("when the app info is not valid JSON", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{"some invalid JSON"}, nil)
 
-				mockUI.EXPECT().Failed("Failed to parse app info JSON:", gomock.Any()).Do(func(_ string, args ...interface{}) {
+				mockUI.EXPECT().Failed("Failed to parse app info JSON: %s", gomock.Any()).Do(func(_ string, args ...interface{}) {
 					Expect(args[0]).To(MatchError("invalid character 's' looking for beginning of value"))
 				})
 
@@ -110,25 +95,36 @@ var _ = Describe("Plugin", func() {
 			})
 		})
 
-		Describe("when the CC info is unavailabe", func() {
+		Context("when there is not exactly one instance of the app", func() {
+			It("should output a failure message", func() {
+				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
+				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 2}}` + "\n"}, nil)
+
+				mockUI.EXPECT().Failed("App must have exactly one instance to be used with cf-watch.")
+
+				plugin.Run(mockCLI, []string{"watch", "some-app"})
+			})
+		})
+
+		Context("when the CC info is unavailabe", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return(nil, errors.New("some error"))
 
-				mockUI.EXPECT().Failed("Failed to retrieve CC info:", errors.New("some error"))
+				mockUI.EXPECT().Failed("Failed to retrieve CC info: %s", errors.New("some error"))
 
 				plugin.Run(mockCLI, []string{"watch", "some-app"})
 			})
 		})
 
-		Describe("when the CC info is not valid JSON", func() {
+		Context("when the CC info is not valid JSON", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{"some invalid JSON"}, nil)
 
-				mockUI.EXPECT().Failed("Failed to parse CC info JSON:", gomock.Any()).Do(func(_ string, args ...interface{}) {
+				mockUI.EXPECT().Failed("Failed to parse CC info JSON: %s", gomock.Any()).Do(func(_ string, args ...interface{}) {
 					Expect(args[0]).To(MatchError("invalid character 's' looking for beginning of value"))
 				})
 
@@ -136,20 +132,20 @@ var _ = Describe("Plugin", func() {
 			})
 		})
 
-		Describe("when the SSH code is unavailabe", func() {
+		Context("when the SSH code is unavailabe", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{`{"app_ssh_endpoint": "some-endpoint"}` + "\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return(nil, errors.New("some error"))
 
-				mockUI.EXPECT().Failed("Failed to retrieve SSH code:", errors.New("some error"))
+				mockUI.EXPECT().Failed("Failed to retrieve SSH code: %s", errors.New("some error"))
 
 				plugin.Run(mockCLI, []string{"watch", "some-app"})
 			})
 		})
 
-		Describe("when connecting to the app over SSH fails", func() {
+		Context("when connecting to the app over SSH fails", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
@@ -158,13 +154,13 @@ var _ = Describe("Plugin", func() {
 
 				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(errors.New("some error"))
 
-				mockUI.EXPECT().Failed("Failed to connect to app over SSH:", errors.New("some error"))
+				mockUI.EXPECT().Failed("Failed to connect to app over SSH: %s", errors.New("some error"))
 
 				plugin.Run(mockCLI, []string{"watch", "some-app"})
 			})
 		})
 
-		Describe("when sending the data over ssh fails", func() {
+		Context("when creating /tmp/watch over SSH fails", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
@@ -172,9 +168,9 @@ var _ = Describe("Plugin", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
 
 				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
-				mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), os.FileMode(0644), int64(0)).Return(errors.New("some error"))
+				mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("test")), os.FileMode(0644), int64(4)).Return(errors.New("some error"))
 
-				mockUI.EXPECT().Failed("Failed to send data to app over SSH:", errors.New("some error"))
+				mockUI.EXPECT().Failed("Failed to send data to app over SSH: %s", errors.New("some error"))
 
 				plugin.Run(mockCLI, []string{"watch", "some-app"})
 			})

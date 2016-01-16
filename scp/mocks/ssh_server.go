@@ -3,21 +3,24 @@ package mocks
 import (
 	"encoding/binary"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 	"golang.org/x/crypto/ssh"
 )
 
 type SSHServer struct {
-	User        string
-	Password    string
-	CommandChan chan string
-	DataChan    chan string
-	FailCommand bool
-	listener    net.Listener
+	User              string
+	Password          string
+	CommandChan       chan string
+	CommandExitStatus byte
+	RejectSession     bool
+	Data              *gbytes.Buffer
+	listener          net.Listener
+	closeChan         chan struct{}
 }
 
 func (s *SSHServer) Start() (address string) {
@@ -26,26 +29,37 @@ func (s *SSHServer) Start() (address string) {
 	var err error
 	s.listener, err = net.Listen("tcp", "127.0.0.1:0")
 	Expect(err).NotTo(HaveOccurred())
-	s.CommandChan = make(chan string, 1000)
-	s.DataChan = make(chan string, 1000)
+	s.closeChan = make(chan struct{})
+
+	s.CommandChan = make(chan string)
+	s.Data = gbytes.NewBuffer()
+
 	go s.listen()
+
 	return s.listener.Addr().String()
 }
 
 func (s *SSHServer) Stop() {
+	if s.listener == nil {
+		return
+	}
 	Expect(s.listener.Close()).To(Succeed())
+	<-s.closeChan
 	s.listener = nil
 }
 
 func (s *SSHServer) listen() {
 	defer GinkgoRecover()
+	defer func() {
+		close(s.closeChan)
+	}()
 
 	config := &ssh.ServerConfig{
 		PasswordCallback: func(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 			if c.User() == s.User && string(pass) == s.Password {
 				return nil, nil
 			}
-			return nil, errors.New("failed to start test ssh server")
+			return nil, errors.New("invalid credentials")
 		},
 	}
 
@@ -58,15 +72,15 @@ func (s *SSHServer) listen() {
 		if err != nil {
 			return
 		}
+
 		_, newChannels, requests, err := ssh.NewServerConn(tcpConn, config)
-		Expect(err).NotTo(HaveOccurred())
+		if err != nil {
+			return
+		}
 
 		go ssh.DiscardRequests(requests)
 		go func() {
 			for newChannel := range newChannels {
-				if s.listener == nil {
-					return
-				}
 				go s.handleChannel(newChannel)
 			}
 		}()
@@ -78,21 +92,37 @@ func (s *SSHServer) handleChannel(newChannel ssh.NewChannel) {
 
 	Expect(newChannel.ChannelType()).To(Equal("session"))
 
-	channel, requests, err := newChannel.Accept()
-	defer channel.Close()
-	Expect(err).NotTo(HaveOccurred())
-	request := <-requests
-	Expect(request.Type).To(Equal("exec"))
-	payloadLen := binary.BigEndian.Uint32(request.Payload[:4])
-	Expect(request.Payload).To(HaveLen(int(payloadLen) + 4))
-	if s.FailCommand {
-		Expect(request.Reply(false, []byte(""))).To(Succeed())
-	} else {
-		Expect(request.Reply(true, nil)).To(Succeed())
+	if s.RejectSession {
+		Expect(newChannel.Reject(ssh.ConnectionFailed, "session rejected")).To(Succeed())
+		return
 	}
-	s.CommandChan <- string(request.Payload[4:])
-	channel.SendRequest("exit-status", false, []byte{0, 0, 0, 0})
-	data, err := ioutil.ReadAll(channel)
+
+	channel, requests, err := newChannel.Accept()
 	Expect(err).NotTo(HaveOccurred())
-	s.DataChan <- string(data)
+
+	go func() {
+		defer GinkgoRecover()
+
+		for request := range requests {
+			switch request.Type {
+			case "exec":
+				payloadLen := binary.BigEndian.Uint32(request.Payload[:4])
+				Expect(request.Payload).To(HaveLen(int(payloadLen) + 4))
+
+				s.CommandChan <- string(request.Payload[4:])
+
+				Expect(request.Reply(true, nil)).To(Succeed())
+
+				_, err := channel.SendRequest("exit-status", false, []byte{0, 0, 0, s.CommandExitStatus})
+				Expect(err).To(Succeed())
+
+				channel.Close()
+				break
+			}
+		}
+	}()
+	go func() {
+		defer GinkgoRecover()
+		io.Copy(s.Data, channel)
+	}()
 }

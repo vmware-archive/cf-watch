@@ -1,12 +1,12 @@
 package scp_test
 
 import (
-	"errors"
 	"io/ioutil"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 
 	. "github.com/pivotal-cf/cf-watch/scp"
 	"github.com/pivotal-cf/cf-watch/scp/mocks"
@@ -33,51 +33,108 @@ var _ = Describe("Session", func() {
 	})
 
 	Describe("#Connect", func() {
-		Describe("with valid credentials", func() {
+		Context("with valid credentials", func() {
 			It("should successfully dial an SSH connection", func() {
 				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
 				Expect(session.Close()).To(Succeed())
 			})
 		})
-		// vvv causes other tests to fail, we should fix that
-		// Describe("with bad credentials", func() {
-		// It("should return an error", func() {
-		// err := session.Connect(serverAddress, "some-invalid-user", "some-invalid-password")
-		// Expect(err).To(Equal(errors.New("invalid credentials")))
-		// })
-		// })
+
+		Context("with invalid credentials", func() {
+			It("should return an error", func() {
+				err := session.Connect(serverAddress, "some-invalid-user", "some-invalid-password")
+				Expect(err).To(MatchError(ContainSubstring("ssh: unable to authenticate")))
+			})
+		})
+
+		Context("when already connected", func() {
+			It("should return an error", func() {
+				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+				defer session.Close()
+				err := session.Connect(serverAddress, "some-valid-user", "some-valid-password")
+				Expect(err).To(MatchError("already connected"))
+			})
+		})
 	})
 
-	Describe("#Send", func() {
-		// TODO: test errors:
-		// - failed to open session (shut down test server after connect)
-		// - failed to open stdin (skip if too difficult)
-		// - failed to copy contents (skip if too difficult)
-		// - failed to write zero byte (skip if too difficult)
-		// - failed to run command (use bad base path)
-		// At least one of the difficult error cases should be solvable
-		// by adding an InvalidStdin bool to the test server.
-
-		It("should send the provided contents and metadata", func() {
+	Describe("#Close", func() {
+		It("should allow a session to be re-connected", func() {
 			Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
-			contents := ioutil.NopCloser(strings.NewReader("some-contents"))
-			Expect(session.Send("/tmp/watch", contents, 0644, 100)).To(Succeed())
-			var result string
-			Eventually(mockSSHServer.CommandChan).Should(Receive(&result))
-			Expect(result).To(Equal("/usr/bin/scp -tr /tmp"))
-			var data string
-			Eventually(mockSSHServer.DataChan).Should(Receive(&data))
-			Expect(data).To(Equal("C0644 100 watch\nsome-contents\x00"))
+			Expect(session.Close()).To(Succeed())
+			Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
 			Expect(session.Close()).To(Succeed())
 		})
 
-		Describe("when command fails", func() {
-			It("returns an error", func() {
-				mockSSHServer.FailCommand = true
+		Context("when called on a closed session", func() {
+			It("should succeed", func() {
 				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+				Expect(session.Close()).To(Succeed())
+				Expect(session.Close()).To(Succeed())
+			})
+		})
+	})
+
+	Describe("#Send", func() {
+		It("should send the provided contents and metadata", func(done Done) {
+			go func() {
+				defer GinkgoRecover()
+
+				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+				defer session.Close()
+
 				contents := ioutil.NopCloser(strings.NewReader("some-contents"))
-				err := session.Send("/does/not/exist/watch", contents, 0644, 100)
-				Expect(err).To(Equal(errors.New("ssh: command /usr/bin/scp -tr /does/not/exist failed")))
+				Expect(session.Send("/tmp/watch", contents, 0644, 100)).To(Succeed())
+
+				Expect(session.Close()).To(Succeed())
+				close(done)
+			}()
+
+			Eventually(mockSSHServer.Data).Should(gbytes.Say("C0644 100 watch\nsome-contents\x00"))
+
+			var result string
+			Eventually(mockSSHServer.CommandChan).Should(Receive(&result))
+			Expect(result).To(Equal("/usr/bin/scp -tr /tmp"))
+		})
+
+		Context("when the session is not connected", func() {
+			It("should return an error", func() {
+				contents := ioutil.NopCloser(strings.NewReader(""))
+				err := session.Send("/tmp/watch", contents, 0644, 100)
+				Expect(err).To(MatchError("session closed"))
+			})
+		})
+
+		Context("when the SSH session cannot be established", func() {
+			It("should return an error", func() {
+				mockSSHServer.RejectSession = true
+
+				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+				defer session.Close()
+
+				contents := ioutil.NopCloser(strings.NewReader(""))
+				err := session.Send("/tmp/watch", contents, 0644, 100)
+				Expect(err).To(MatchError("ssh: rejected: connect failed (session rejected)"))
+			})
+		})
+
+		Context("when the remote scp command fails", func() {
+			It("should return an error", func(done Done) {
+				mockSSHServer.CommandExitStatus = 1
+
+				go func() {
+					defer GinkgoRecover()
+
+					Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+					defer session.Close()
+
+					contents := ioutil.NopCloser(strings.NewReader(""))
+					err := session.Send("/tmp/watch", contents, 0644, 100)
+					Expect(err).To(MatchError(ContainSubstring("Process exited with: 1")))
+
+					close(done)
+				}()
+
+				Eventually(mockSSHServer.CommandChan).Should(Receive())
 			})
 		})
 	})

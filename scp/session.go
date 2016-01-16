@@ -16,7 +16,7 @@ type Session struct {
 
 func (s *Session) Connect(endpoint, username, password string) error {
 	if s.client != nil {
-		panic("double connect")
+		return errors.New("already connected")
 	}
 
 	var err error
@@ -34,13 +34,24 @@ func (s *Session) Connect(endpoint, username, password string) error {
 }
 
 func (s *Session) Close() error {
-	return s.client.Close()
+	if s.client == nil {
+		return nil
+	}
+	if err := s.client.Close(); err != nil {
+		return err
+	}
+	s.client = nil
+	return nil
 }
 
 func (s *Session) Send(path string, contents io.ReadCloser, mode os.FileMode, size int64) error {
+	if s.client == nil {
+		return errors.New("session closed")
+	}
+
 	session, err := s.client.NewSession()
 	if err != nil {
-		return errors.New("Failed to open session: " + err.Error())
+		return err
 	}
 	defer session.Close()
 
