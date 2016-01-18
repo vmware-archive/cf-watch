@@ -87,8 +87,11 @@ func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 		return
 	}
 
-	contents := strings.NewReader("test")
-	if err := p.Session.Send("/tmp/watch", ioutil.NopCloser(contents), 0644, contents.Size()); err != nil {
+	var contents string
+	if len(args) >= 3 {
+		contents = args[2]
+	}
+	if err := p.Session.Send("/tmp/watch", ioutil.NopCloser(strings.NewReader(contents)), 0644, int64(len(contents))); err != nil {
 		p.UI.Failed("Failed to send data to app over SSH: %s", err)
 		return
 	}

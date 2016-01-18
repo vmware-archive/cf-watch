@@ -51,7 +51,19 @@ var _ = Describe("Plugin", func() {
 	Describe("#Run", func() {
 		It("should connect to the app and send a /tmp/watch file", func() {
 			mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
-			mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("test")), os.FileMode(0644), int64(4)).Return(nil)
+			mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("some-text")), os.FileMode(0644), int64(9)).Return(nil)
+
+			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
+			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
+			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{`{"app_ssh_endpoint": "some-endpoint"}` + "\n"}, nil)
+			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
+
+			plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
+		})
+
+		It("should send empty /tmp/watch file when no contents are given", func() {
+			mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
+			mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("")), os.FileMode(0644), int64(0)).Return(nil)
 
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
@@ -67,7 +79,7 @@ var _ = Describe("Plugin", func() {
 
 				mockUI.EXPECT().Failed("Failed to retrieve app GUID: %s", errors.New("some error"))
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -78,7 +90,7 @@ var _ = Describe("Plugin", func() {
 
 				mockUI.EXPECT().Failed("Failed to retrieve app info: %s", errors.New("some error"))
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -91,7 +103,7 @@ var _ = Describe("Plugin", func() {
 					Expect(args[0]).To(MatchError("invalid character 's' looking for beginning of value"))
 				})
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -102,7 +114,7 @@ var _ = Describe("Plugin", func() {
 
 				mockUI.EXPECT().Failed("App must have exactly one instance to be used with cf-watch.")
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -114,7 +126,7 @@ var _ = Describe("Plugin", func() {
 
 				mockUI.EXPECT().Failed("Failed to retrieve CC info: %s", errors.New("some error"))
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -128,7 +140,7 @@ var _ = Describe("Plugin", func() {
 					Expect(args[0]).To(MatchError("invalid character 's' looking for beginning of value"))
 				})
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -141,7 +153,7 @@ var _ = Describe("Plugin", func() {
 
 				mockUI.EXPECT().Failed("Failed to retrieve SSH code: %s", errors.New("some error"))
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -156,7 +168,7 @@ var _ = Describe("Plugin", func() {
 
 				mockUI.EXPECT().Failed("Failed to connect to app over SSH: %s", errors.New("some error"))
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 
@@ -168,11 +180,11 @@ var _ = Describe("Plugin", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
 
 				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
-				mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("test")), os.FileMode(0644), int64(4)).Return(errors.New("some error"))
+				mockSession.EXPECT().Send("/tmp/watch", ioutil.NopCloser(strings.NewReader("some-text")), os.FileMode(0644), int64(9)).Return(errors.New("some error"))
 
 				mockUI.EXPECT().Failed("Failed to send data to app over SSH: %s", errors.New("some error"))
 
-				plugin.Run(mockCLI, []string{"watch", "some-app"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-text"})
 			})
 		})
 	})
