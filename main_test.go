@@ -62,10 +62,10 @@ var _ = Describe("CF Watch", func() {
 	})
 
 	It("should write a `/tmp/watch` file to the app container", func() {
-		Eventually(cf("watch", "test-app", "text"), "2s").Should(gexec.Exit(0))
+		Eventually(cf("watch", "test-app", "fixtures/some-dir/some-nested-dir/some-file"), "2s").Should(gexec.Exit(0))
 		session := cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch", "-i", "0")
 		Eventually(session).Should(gexec.Exit(0))
-		Expect(session).To(gbytes.Say("text"))
+		Expect(session).To(gbytes.Say("some-text"))
 	})
 })
 

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -87,11 +86,18 @@ func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 		return
 	}
 
-	var contents string
-	if len(args) >= 3 {
-		contents = args[2]
+	file, err := os.Open(args[2])
+	if err != nil {
+		p.UI.Failed("Failed to open file: %s", err)
+		return
 	}
-	if err := p.Session.Send("/tmp/watch", ioutil.NopCloser(strings.NewReader(contents)), 0644, int64(len(contents))); err != nil {
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		p.UI.Failed("Failed to stat file: %s", err)
+		return
+	}
+	if err := p.Session.Send("/tmp/watch", file, 0644, fileInfo.Size()); err != nil {
 		p.UI.Failed("Failed to send data to app over SSH: %s", err)
 		return
 	}
