@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
@@ -17,6 +18,8 @@ var _ = Describe("Session", func() {
 		session       *Session
 		mockSSHServer *mocks.SSHServer
 		serverAddress string
+		mockCtrl      *gomock.Controller
+		mockFile      *mocks.MockFile
 	)
 
 	BeforeEach(func() {
@@ -26,6 +29,8 @@ var _ = Describe("Session", func() {
 			Password: "some-valid-password",
 		}
 		serverAddress = mockSSHServer.Start()
+		mockCtrl = gomock.NewController(GinkgoT())
+		mockFile = mocks.NewMockFile(mockCtrl)
 	})
 
 	AfterEach(func() {
@@ -75,7 +80,12 @@ var _ = Describe("Session", func() {
 	})
 
 	Describe("#Send", func() {
-		It("should send the provided contents and metadata", func(done Done) {
+		It("should create an empty directory", func(done Done) {
+			mockFile.EXPECT().BaseName().Return("some-file")
+			mockFile.EXPECT().Children().Return([]*File{})
+			mockFile.EXPECT().ModePerm().Return("0644")
+			mockFile.EXPECT().Read(gomock.Any()).Return(12, nil)
+			mockFile.EXPECT().Close().Return(nil)
 			go func() {
 				defer GinkgoRecover()
 

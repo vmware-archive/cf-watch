@@ -14,6 +14,15 @@ type Session struct {
 	client *ssh.Client
 }
 
+//go:generate mockgen -package mocks -destination mocks/file.go github.com/pivotal-cf/cf-watch/scp File
+type File interface {
+	BaseName() string
+	Children() ([]*File, error)
+	ModePerm() (string, error)
+	Read([]byte) (int, error)
+	Close() error
+}
+
 func (s *Session) Connect(endpoint, username, password string) error {
 	if s.client != nil {
 		return errors.New("already connected")

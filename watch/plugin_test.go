@@ -3,6 +3,7 @@ package watch_test
 import (
 	"errors"
 	"io"
+	"io/ioutil"
 	"os"
 
 	cliplugin "github.com/cloudfoundry/cli/plugin"
@@ -51,9 +52,7 @@ var _ = Describe("Plugin", func() {
 		It("should connect to the app and send /tmp/watch file with contents from local file", func() {
 			mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
 			mockSession.EXPECT().Send("/tmp/watch", gomock.Any(), os.FileMode(0644), int64(9)).Return(nil).Do(func(path string, fileReadCloser io.ReadCloser, fileMode os.FileMode, length int64) {
-				data := make([]byte, 9)
-				fileReadCloser.Read(data)
-				Expect(string(data)).To(Equal("some-text"))
+				Expect(ioutil.ReadAll(fileReadCloser)).To(Equal([]byte("some-text")))
 			})
 
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
@@ -188,9 +187,7 @@ var _ = Describe("Plugin", func() {
 
 				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
 				mockSession.EXPECT().Send("/tmp/watch", gomock.Any(), os.FileMode(0644), int64(9)).Return(errors.New("some error")).Do(func(path string, fileReadCloser io.ReadCloser, fileMode os.FileMode, length int64) {
-					data := make([]byte, 9)
-					fileReadCloser.Read(data)
-					Expect(string(data)).To(Equal("some-text"))
+					Expect(ioutil.ReadAll(fileReadCloser)).To(Equal([]byte("some-text")))
 				})
 
 				mockUI.EXPECT().Failed("Failed to send data to app over SSH: %s", errors.New("some error"))
