@@ -3,18 +3,17 @@ package watch
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
 	"path"
 	"strings"
 
 	"github.com/cloudfoundry/cli/plugin"
+	"github.com/pivotal-cf/cf-watch/filetree"
 )
 
 //go:generate mockgen -package mocks -destination mocks/session.go github.com/pivotal-cf/cf-watch/watch Session
 type Session interface {
 	Connect(endpoint, guid, password string) error
-	Send(path string, contents io.ReadCloser, mode os.FileMode, size int64) error
+	Send(file filetree.File) error
 }
 
 //go:generate mockgen -package mocks -destination mocks/cli.go github.com/pivotal-cf/cf-watch/watch CLI
@@ -27,13 +26,29 @@ type UI interface {
 	Failed(message string, args ...interface{})
 }
 
+//go:generate mockgen -package mocks -destination mocks/file.go github.com/pivotal-cf/cf-watch/watch File
+type File interface {
+	filetree.File
+}
+
+//go:generate mockgen -package mocks -destination mocks/tree.go github.com/pivotal-cf/cf-watch/watch Tree
+type Tree interface {
+	New(path string) (filetree.File, error)
+}
+
 type Plugin struct {
 	Session Session
 	UI      UI
+	Tree    Tree
 }
 
 func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 	var cli CLI = cliConnection
+
+	if len(args) < 3 {
+		p.UI.Failed("Usage: cf %s <app> <local-dir>", args[0])
+		return
+	}
 
 	appGUIDOutput, err := cli.CliCommandWithoutTerminalOutput("app", args[1], "--guid")
 	if err != nil {
@@ -86,18 +101,13 @@ func (p *Plugin) Run(cliConnection plugin.CliConnection, args []string) {
 		return
 	}
 
-	file, err := os.Open(args[2])
+	file, err := p.Tree.New(args[2])
 	if err != nil {
-		p.UI.Failed("Failed to open file: %s", err)
+		p.UI.Failed("Failed to process local app directory: %s", err)
 		return
 	}
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		p.UI.Failed("Failed to stat file: %s", err)
-		return
-	}
-	if err := p.Session.Send("/tmp/watch", file, 0644, fileInfo.Size()); err != nil {
+	if err := p.Session.Send(file); err != nil {
 		p.UI.Failed("Failed to send data to app over SSH: %s", err)
 		return
 	}

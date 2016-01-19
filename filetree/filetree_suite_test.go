@@ -1,4 +1,4 @@
-package file_tree_test
+package filetree_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -9,5 +9,5 @@ import (
 
 func TestFileTree(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "File Tree Suite")
+	RunSpecs(t, "FileTree Suite")
 }

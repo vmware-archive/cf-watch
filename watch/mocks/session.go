@@ -5,8 +5,7 @@ package mocks
 
 import (
 	gomock "github.com/golang/mock/gomock"
-	io "io"
-	os "os"
+	filetree "github.com/pivotal-cf/cf-watch/filetree"
 )
 
 // Mock of Session interface
@@ -40,12 +39,12 @@ func (_mr *_MockSessionRecorder) Connect(arg0, arg1, arg2 interface{}) *gomock.C
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Connect", arg0, arg1, arg2)
 }
 
-func (_m *MockSession) Send(_param0 string, _param1 io.ReadCloser, _param2 os.FileMode, _param3 int64) error {
-	ret := _m.ctrl.Call(_m, "Send", _param0, _param1, _param2, _param3)
+func (_m *MockSession) Send(_param0 filetree.File) error {
+	ret := _m.ctrl.Call(_m, "Send", _param0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-func (_mr *_MockSessionRecorder) Send(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
-	return _mr.mock.ctrl.RecordCall(_mr.mock, "Send", arg0, arg1, arg2, arg3)
+func (_mr *_MockSessionRecorder) Send(arg0 interface{}) *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Send", arg0)
 }

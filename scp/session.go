@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
+
+	"github.com/pivotal-cf/cf-watch/filetree"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -16,11 +16,7 @@ type Session struct {
 
 //go:generate mockgen -package mocks -destination mocks/file.go github.com/pivotal-cf/cf-watch/scp File
 type File interface {
-	BaseName() string
-	Children() ([]*File, error)
-	ModePerm() (string, error)
-	Read([]byte) (int, error)
-	Close() error
+	filetree.File
 }
 
 func (s *Session) Connect(endpoint, username, password string) error {
@@ -53,7 +49,7 @@ func (s *Session) Close() error {
 	return nil
 }
 
-func (s *Session) Send(path string, contents io.ReadCloser, mode os.FileMode, size int64) error {
+func (s *Session) Send(file File) error {
 	if s.client == nil {
 		return errors.New("session closed")
 	}
@@ -73,9 +69,18 @@ func (s *Session) Send(path string, contents io.ReadCloser, mode os.FileMode, si
 		}
 		defer stdin.Close()
 
-		fmt.Fprintf(stdin, "C%04o %d %s\n", mode, size, filepath.Base(path))
+		mode, err := file.Mode()
+		if err != nil {
+			panic(err)
+		}
+		size, err := file.Size()
+		if err != nil {
+			panic(err)
+		}
 
-		if _, err := io.Copy(stdin, contents); err != nil {
+		fmt.Fprintf(stdin, "C%04o %d %s\n", mode, size, file.Basename())
+
+		if _, err := io.Copy(stdin, file); err != nil {
 			errChan <- err
 			return
 		}
@@ -85,7 +90,7 @@ func (s *Session) Send(path string, contents io.ReadCloser, mode os.FileMode, si
 		}
 	}()
 	go func() {
-		if err := session.Run(fmt.Sprintf("/usr/bin/scp -tr %s", filepath.Dir(path))); err != nil {
+		if err := session.Run("/usr/bin/scp -tr /home/vcap"); err != nil {
 			errChan <- err
 		}
 		close(errChan)

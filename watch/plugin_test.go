@@ -2,9 +2,6 @@ package watch_test
 
 import (
 	"errors"
-	"io"
-	"io/ioutil"
-	"os"
 
 	cliplugin "github.com/cloudfoundry/cli/plugin"
 	"github.com/golang/mock/gomock"
@@ -31,6 +28,8 @@ var _ = Describe("Plugin", func() {
 		mockSession *mocks.MockSession
 		mockCLI     *mockCLIWrapper
 		mockUI      *mocks.MockUI
+		mockFile    *mocks.MockFile
+		mockTree    *mocks.MockTree
 	)
 
 	BeforeEach(func() {
@@ -38,9 +37,12 @@ var _ = Describe("Plugin", func() {
 		mockSession = mocks.NewMockSession(mockCtrl)
 		mockCLI = &mockCLIWrapper{MockCLI: mocks.NewMockCLI(mockCtrl)}
 		mockUI = mocks.NewMockUI(mockCtrl)
+		mockFile = mocks.NewMockFile(mockCtrl)
+		mockTree = mocks.NewMockTree(mockCtrl)
 		plugin = &Plugin{
 			Session: mockSession,
 			UI:      mockUI,
+			Tree:    mockTree,
 		}
 	})
 
@@ -50,17 +52,25 @@ var _ = Describe("Plugin", func() {
 
 	Describe("#Run", func() {
 		It("should connect to the app and send /tmp/watch file with contents from local file", func() {
+			mockTree.EXPECT().New("some-path").Return(mockFile, nil)
+
 			mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
-			mockSession.EXPECT().Send("/tmp/watch", gomock.Any(), os.FileMode(0644), int64(9)).Return(nil).Do(func(path string, fileReadCloser io.ReadCloser, fileMode os.FileMode, length int64) {
-				Expect(ioutil.ReadAll(fileReadCloser)).To(Equal([]byte("some-text")))
-			})
+			mockSession.EXPECT().Send(mockFile).Return(nil)
 
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{`{"app_ssh_endpoint": "some-endpoint"}` + "\n"}, nil)
 			mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
 
-			plugin.Run(mockCLI, []string{"watch", "some-app", "../fixtures/some-dir/some-nested-dir/some-file"})
+			plugin.Run(mockCLI, []string{"watch", "some-app", "some-path"})
+		})
+
+		Context("when watch is called without enough arguments", func() {
+			It("should output a failure message", func() {
+				mockUI.EXPECT().Failed("Usage: cf %s <app> <local-dir>", "watch")
+
+				plugin.Run(mockCLI, []string{"watch"}) // TODO: FIXME
+			})
 		})
 
 		Context("when the app GUID is unavailable", func() {
@@ -162,8 +172,10 @@ var _ = Describe("Plugin", func() {
 			})
 		})
 
-		Context("when opening a file fails", func() {
+		Context("when creating a new tree fails", func() {
 			It("should output a failure message", func() {
+				mockTree.EXPECT().New("some-bad-path").Return(nil, errors.New("some error"))
+
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{`{"app_ssh_endpoint": "some-endpoint"}` + "\n"}, nil)
@@ -171,28 +183,27 @@ var _ = Describe("Plugin", func() {
 
 				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
 
-				mockUI.EXPECT().Failed("Failed to open file: %s", gomock.Any()).Do(func(prefix string, err error) {
-					Expect(err).To(MatchError("open some-bad-file: no such file or directory"))
-				})
-				plugin.Run(mockCLI, []string{"watch", "some-app", "some-bad-file"})
+				mockUI.EXPECT().Failed("Failed to process local app directory: %s", errors.New("some error"))
+
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-bad-path"})
 			})
 		})
 
 		Context("when creating new directory over SSH fails", func() {
 			It("should output a failure message", func() {
+				mockTree.EXPECT().New("some-path").Return(mockFile, nil)
+
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return([]string{`{"entity": {"instances": 1}}` + "\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/info").Return([]string{`{"app_ssh_endpoint": "some-endpoint"}` + "\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("ssh-code").Return([]string{"some-password\n"}, nil)
 
 				mockSession.EXPECT().Connect("some-endpoint", "cf:some-guid/0", "some-password").Return(nil)
-				mockSession.EXPECT().Send("/tmp/watch", gomock.Any(), os.FileMode(0644), int64(9)).Return(errors.New("some error")).Do(func(path string, fileReadCloser io.ReadCloser, fileMode os.FileMode, length int64) {
-					Expect(ioutil.ReadAll(fileReadCloser)).To(Equal([]byte("some-text")))
-				})
+				mockSession.EXPECT().Send(mockFile).Return(errors.New("some error"))
 
 				mockUI.EXPECT().Failed("Failed to send data to app over SSH: %s", errors.New("some error"))
 
-				plugin.Run(mockCLI, []string{"watch", "some-app", "../fixtures/some-dir/some-nested-dir/some-file"})
+				plugin.Run(mockCLI, []string{"watch", "some-app", "some-path"})
 			})
 		})
 	})
