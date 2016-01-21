@@ -45,17 +45,23 @@ var _ = Describe("FileTree", func() {
 			It("should create a tree of nested directory structures", func() {
 				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir"))
 				Expect(err).NotTo(HaveOccurred())
+				Expect(file.Open()).To(Succeed())
 				Expect(file.Basename()).To(Equal("some-parent-dir"))
 				Expect(file.Children()).To(HaveLen(1))
+				Expect(file.Close()).To(Succeed())
 
 				childDir := file.Children()[0]
+				Expect(childDir.Open()).To(Succeed())
 				Expect(childDir.Basename()).To(Equal("some-child-dir"))
 				Expect(childDir.Children()).To(HaveLen(1))
+				Expect(childDir.Close()).To(Succeed())
 
 				childFile := childDir.Children()[0]
+				Expect(childFile.Open()).To(Succeed())
 				Expect(childFile.Basename()).To(Equal("some-file"))
 				Expect(ioutil.ReadAll(childFile)).To(Equal([]byte("some-content")))
 				Expect(childFile.Children()).To(BeEmpty())
+				Expect(childFile.Close()).To(Succeed())
 			})
 
 			Context("when opening a file returns an error", func() {
@@ -82,6 +88,20 @@ var _ = Describe("FileTree", func() {
 	})
 
 	Describe("File", func() {
+		Describe("#Open", func() {
+			FIt("should open the file", func() {
+				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))
+				Expect(err).NotTo(HaveOccurred())
+
+				_, err := ioutil.ReadAll(file)
+				Expect(err).To(MatchError("file closed"))
+
+				Expect(file.Open()).To(Succeed())
+				defer file.Close()
+				Expect(ioutil.ReadAll(file)).To(Equal("some-content"))
+			})
+		})
+
 		Describe("#Basename", func() {
 			It("should return the base name of the file", func() {
 				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))

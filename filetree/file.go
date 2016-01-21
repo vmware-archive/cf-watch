@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 )
 
-type Tree struct{}
-
 type File interface {
 	io.ReadCloser
 	Basename() string
@@ -17,10 +15,7 @@ type File interface {
 	Size() (int64, error)
 }
 
-type file struct {
-	*os.File
-	children []File
-}
+type Tree struct{}
 
 func (t *Tree) New(path string) (File, error) {
 	osFile, err := os.Open(path)
@@ -53,6 +48,11 @@ func (t *Tree) New(path string) (File, error) {
 		File:     osFile,
 		children: children,
 	}, nil
+}
+
+type file struct {
+	*os.File
+	children []File
 }
 
 func (f *file) Basename() string {

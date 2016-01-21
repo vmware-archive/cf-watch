@@ -69,7 +69,7 @@ var _ = Describe("Plugin", func() {
 			It("should output a failure message", func() {
 				mockUI.EXPECT().Failed("Usage: cf %s <app> <local-dir>", "watch")
 
-				plugin.Run(mockCLI, []string{"watch"}) // TODO: FIXME
+				plugin.Run(mockCLI, []string{"watch"})
 			})
 		})
 
@@ -83,7 +83,7 @@ var _ = Describe("Plugin", func() {
 			})
 		})
 
-		Context("when the app info is unavailabe", func() {
+		Context("when the app info is unavailable", func() {
 			It("should output a failure message", func() {
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("app", "some-app", "--guid").Return([]string{"some-guid\n"}, nil)
 				mockCLI.EXPECT().CliCommandWithoutTerminalOutput("curl", "/v2/apps/some-guid").Return(nil, errors.New("some error"))

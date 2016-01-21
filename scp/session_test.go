@@ -2,7 +2,7 @@ package scp_test
 
 import (
 	"bytes"
-	"fmt"
+	"io"
 	"os"
 
 	"github.com/golang/mock/gomock"
@@ -83,18 +83,17 @@ var _ = Describe("Session", func() {
 	})
 
 	Describe("#Send", func() {
-		It("should create an empty directory", func(done Done) {
+		FIt("should create an empty directory", func(done Done) {
 			mockFile.EXPECT().Basename().Return("some-file")
 			mockFile.EXPECT().Children().Return([]filetree.File{})
 			mockFile.EXPECT().Mode().Return(os.FileMode(0644), nil)
 			mockFile.EXPECT().Size().Return(int64(14), nil)
 			mockFile.EXPECT().Close().Return(nil)
 
-			mockFile.EXPECT().Read(gomock.Any()).Return(14, nil).Do(func(buffer []byte) {
+			mockFile.EXPECT().Read(gomock.Any()).Return(14, io.EOF).Do(func(buffer []byte) {
 				defer GinkgoRecover()
 
 				_, err := bytes.NewBufferString("some-contents").Read(buffer)
-				fmt.Printf("\n\n\nbuffer: [%s]\n\n\n", buffer)
 				Expect(err).NotTo(HaveOccurred())
 			})
 
@@ -110,50 +109,50 @@ var _ = Describe("Session", func() {
 				close(done)
 			}()
 
-			Eventually(mockSSHServer.Data).Should(gbytes.Say("C0644 100 watch\nsome-contents\x00"))
+			Eventually(mockSSHServer.Data).Should(gbytes.Say("C0644 14 some-file\nsome-contents\x00"))
 
 			var result string
 			Eventually(mockSSHServer.CommandChan).Should(Receive(&result))
 			Expect(result).To(Equal("/usr/bin/scp -tr /home/vcap"))
 		})
 
-		// Context("when the session is not connected", func() {
-		// It("should return an error", func() {
-		// err := session.Send(mockFile)
-		// Expect(err).To(MatchError("session closed"))
-		// })
-		// })
+		Context("when the session is not connected", func() {
+			It("should return an error", func() {
+				err := session.Send(mockFile)
+				Expect(err).To(MatchError("session closed"))
+			})
+		})
 
-		// Context("when the SSH session cannot be established", func() {
-		// It("should return an error", func() {
-		// mockSSHServer.RejectSession = true
+		Context("when the SSH session cannot be established", func() {
+			It("should return an error", func() {
+				mockSSHServer.RejectSession = true
 
-		// Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
-		// defer session.Close()
+				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+				defer session.Close()
 
-		// err := session.Send(mockFile)
-		// Expect(err).To(MatchError("ssh: rejected: connect failed (session rejected)"))
-		// })
-		// })
+				err := session.Send(mockFile)
+				Expect(err).To(MatchError("ssh: rejected: connect failed (session rejected)"))
+			})
+		})
 
-		// Context("when the remote scp command fails", func() {
-		// It("should return an error", func(done Done) {
-		// mockSSHServer.CommandExitStatus = 1
+		Context("when the remote scp command fails", func() {
+			It("should return an error", func(done Done) {
+				mockSSHServer.CommandExitStatus = 1
 
-		// go func() {
-		// defer GinkgoRecover()
+				go func() {
+					defer GinkgoRecover()
 
-		// Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
-		// defer session.Close()
+					Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
+					defer session.Close()
 
-		// err := session.Send(mockFile)
-		// Expect(err).To(MatchError(ContainSubstring("Process exited with: 1")))
+					err := session.Send(mockFile)
+					Expect(err).To(MatchError(ContainSubstring("Process exited with: 1")))
 
-		// close(done)
-		// }()
+					close(done)
+				}()
 
-		// Eventually(mockSSHServer.CommandChan).Should(Receive())
-		// })
-		// })
+				Eventually(mockSSHServer.CommandChan).Should(Receive())
+			})
+		})
 	})
 })

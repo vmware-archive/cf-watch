@@ -50,6 +50,7 @@ func (s *Session) Close() error {
 }
 
 func (s *Session) Send(file File) error {
+	defer file.Close()
 	if s.client == nil {
 		return errors.New("session closed")
 	}
