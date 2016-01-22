@@ -1,0 +1,14 @@
+resources:
+  - name: cf-watch
+    type: git
+    source: 
+      uri: https://github.com/pivotal-cf/cf-watch.git
+      branch: master
+
+jobs:
+  - name: unit-tests
+    plan:
+    - get: cf-watch
+      trigger: true
+    - task: unit-tests
+      file: cf-watch/ci/tasks/unit-tests.yml 

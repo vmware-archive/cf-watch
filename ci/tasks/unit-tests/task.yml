@@ -1,0 +1,7 @@
+---
+platform: linux
+image: docker:///micropcf/ci
+inputs:
+- name: cf-watch
+run:
+  path: cf-watch/ci/tasks/unit-tests/run.sh
