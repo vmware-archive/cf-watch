@@ -1,0 +1,11 @@
+---
+platform: linux
+image: docker:///micropcf/ci
+inputs:
+- name: cf-watch
+- name: deploy
+- name: executors
+run:
+  path: cf-watch/ci/tasks/cleanup-deploy-local/run.sh
+params:
+  EXECUTOR_PRIVATE_KEY: some-executor-private-key
