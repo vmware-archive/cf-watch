@@ -11,4 +11,4 @@ jobs:
     - get: cf-watch
       trigger: true
     - task: unit-tests
-      file: cf-watch/ci/tasks/unit-tests.yml 
+      file: cf-watch/ci/tasks/unit-tests/task.yml 
