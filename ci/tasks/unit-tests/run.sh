@@ -3,7 +3,7 @@
 set -ex
 export GO15VENDOREXPERIMENT=1
 export GOPATH=$PWD/go
-export PATH=$GOPATH:$PATH
+export PATH=$GOPATH/bin:$PATH
 
 mkdir -p go/src/github.com/pivotal-cf
 cp -r cf-watch go/src/github.com/pivotal-cf/
