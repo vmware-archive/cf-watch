@@ -13,7 +13,7 @@ ssh-keyscan $executor_address >> $HOME/.ssh/known_hosts
 remote_path=$(ssh -i executor.pem vcap@$executor_address mktemp -td deploy-vmware.XXXXXXXX)
 echo $remote_path > remote_path
 
-rsync -a -e "ssh -i executor.pem" base-vagrantfile-release/Vagrantfile-* vcap@$executor_address:$remote_path/Vagrantfile
+rsync -a -e "ssh -i executor.pem" vagrantfile/Vagrantfile-* vcap@$executor_address:$remote_path/Vagrantfile
 
 ssh -i executor.pem vcap@$executor_address <<EOF
   cd "$remote_path"
