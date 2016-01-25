@@ -1,9 +1,9 @@
 resources:
   - name: cf-watch
     type: git
-    source: 
+    source:
       uri: https://github.com/pivotal-cf/cf-watch.git
-      branch: master
+      branch: wip-cf-watch
   - name: executors
     type: pool
     source:
@@ -25,7 +25,8 @@ jobs:
     - get: cf-watch
       trigger: true
     - task: unit-tests
-      file: cf-watch/ci/tasks/unit-tests/task.yml 
+      file: cf-watch/ci/tasks/unit-tests/task.yml
+
   - name: acceptance-tests
     plan:
     - aggregate:
@@ -36,27 +37,27 @@ jobs:
         trigger: true
         passed: [unit-tests]
       - get: base-vagrantfile-release
-#   - do:
-#     - task: deploy
-#       tags: [vsphere-linux-worker]
-#       file: cf-watch/ci/tasks/deploy-vmware/task.yml
-#       config:
-#         params:
-#           EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
-#     - task: acceptance-tests
-#       tags: [vsphere-linux-worker]
-#       file: cf-watch/ci/tasks/acceptance-tests/task.yml
-#       config:
-#         params:
-#           EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
-#     ensure:
-#       do:
-#       - task: cleanup-deploy-local
-#         tags: [vsphere-linux-worker]
-#         file: cf-watch/ci/tasks/cleanup-deploy-local/task.yml
-#         config:
-#           params:
-#             EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
-#       - put: executors
-#         params:
-#           release: executors
+    - do:
+      - task: deploy
+        tags: [vsphere-linux-worker]
+        file: cf-watch/ci/tasks/deploy-vmware/task.yml
+        config:
+          params:
+            EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
+      - task: acceptance-tests
+        tags: [vsphere-linux-worker]
+        file: cf-watch/ci/tasks/acceptance-tests/task.yml
+        config:
+          params:
+            EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
+      ensure:
+        do:
+        - task: cleanup-deploy-local
+          tags: [vsphere-linux-worker]
+          file: cf-watch/ci/tasks/cleanup-deploy-local/task.yml
+          config:
+            params:
+              EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
+        - put: executors
+          params:
+            release: executors
