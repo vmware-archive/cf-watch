@@ -28,6 +28,8 @@ ssh -A -i executor.pem vcap@$executor_address <<EOF
   export GOPATH=$remote_path/go
   export PATH=$remote_path/go/bin:\$PATH
   export CF_DOMAIN=local.micropcf.io
+  export CF_USERNAME=admin
+  export CF_PASSWORD=admin
 
   cd $remote_path/$cf_watch_path
   go install ./vendor/github.com/onsi/ginkgo/ginkgo
