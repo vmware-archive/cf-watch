@@ -19,4 +19,5 @@ jobs:
       trigger: true
       passed: [unit-tests]
     - task: acceptance-tests
+      privileged: true
       file: cf-watch/ci/tasks/acceptance-tests/task.yml

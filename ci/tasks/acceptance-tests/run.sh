@@ -8,6 +8,8 @@ export GO15VENDOREXPERIMENT=1
 export GOPATH=$PWD/go
 export PATH=$GOPATH/bin:$PATH
 export CF_DOMAIN=local.nanocf
+export CF_USERNAME=admin
+export CF_PASSWORD=admin
 
 mkdir -p go/src/github.com/pivotal-cf
 cp -r cf-watch go/src/github.com/pivotal-cf/
