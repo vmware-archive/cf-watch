@@ -15,10 +15,10 @@ remote_path=$(ssh -i executor.pem vcap@$executor_address mktemp -td cf-watch.XXX
 function cleanup { ssh -i executor.pem vcap@$executor_address rm -rf "$remote_path"; }
 trap cleanup EXIT
 
-cf_watch_path=go/src/github.com/pivotal-cf/cf-watch
+cf_watch_path=go/src/github.com/pivotal-cf/cf-watch-2
 ssh -A -i executor.pem vcap@$executor_address mkdir -p $remote_path/$cf_watch_path
 
-rsync -a -e "ssh -i executor.pem" cf-watch vcap@$executor_address:$remote_path/$cf_watch_path
+rsync -a -e "ssh -i executor.pem" cf-watch-2 vcap@$executor_address:$remote_path/$cf_watch_path
 rm -rf micropcf || true
 
 domain=$(cat deploy/domain)

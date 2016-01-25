@@ -2,10 +2,10 @@
 platform: linux
 image: docker:///micropcf/ci
 inputs:
-- name: cf-watch
+- name: cf-watch-2
 - name: deploy
 - name: executors
 run:
-  path: cf-watch/ci/tasks/acceptance-tests/run.sh
+  path: cf-watch-2/ci/tasks/acceptance-tests/run.sh
 params:
   EXECUTOR_PRIVATE_KEY: some-executors-private-key
