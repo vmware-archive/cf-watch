@@ -1,5 +1,5 @@
 resources:
-  - name: cf-watch-2
+  - name: cf-watch
     type: git
     source:
       uri: https://github.com/pivotal-cf/cf-watch.git
@@ -15,17 +15,17 @@ resources:
     type: s3
     source:
       bucket: micropcf
-      regexp: releases/Vagrantfile-v(.*)[.]base
+      regexp: /releases/Vagrantfile-v(.*)[.]base
       access_key_id: {{aws-access-key-id}}
       secret_access_key: {{aws-secret-access-key}}
 
 jobs:
   - name: unit-tests
     plan:
-    - get: cf-watch-2
+    - get: cf-watch
       trigger: true
     - task: unit-tests
-      file: cf-watch-2/ci/tasks/unit-tests/task.yml
+      file: cf-watch/ci/tasks/unit-tests/task.yml
 
   - name: acceptance-tests
     plan:
@@ -33,20 +33,20 @@ jobs:
       - put: executors
         params:
           acquire: true
-      - get: cf-watch-2
+      - get: cf-watch
         trigger: true
         passed: [unit-tests]
       - get: base-vagrantfile-release
     - do:
       - task: deploy
         tags: [vsphere-linux-worker]
-        file: cf-watch-2/ci/tasks/deploy-vmware/task.yml
+        file: cf-watch/ci/tasks/deploy-vmware/task.yml
         config:
           params:
             EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
       - task: acceptance-tests
         tags: [vsphere-linux-worker]
-        file: cf-watch-2/ci/tasks/acceptance-tests/task.yml
+        file: cf-watch/ci/tasks/acceptance-tests/task.yml
         config:
           params:
             EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
@@ -54,7 +54,7 @@ jobs:
         do:
         - task: cleanup-deploy-local
           tags: [vsphere-linux-worker]
-          file: cf-watch-2/ci/tasks/cleanup-deploy-local/task.yml
+          file: cf-watch/ci/tasks/cleanup-deploy-local/task.yml
           config:
             params:
               EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
