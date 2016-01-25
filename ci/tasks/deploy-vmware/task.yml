@@ -3,7 +3,7 @@ platform: linux
 image: docker:///micropcf/ci
 inputs:
 - name: cf-watch
-- name: base-vagrantfile-release
+- name: vagrantfile
 - name: executors
 run:
   path: cf-watch/ci/tasks/deploy-vmware/run.sh

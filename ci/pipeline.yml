@@ -11,11 +11,11 @@ resources:
       branch: master
       pool: executors
       private_key: {{github-ssh-key}}
-  - name: base-vagrantfile-release
+  - name: vagrantfile
     type: s3
     source:
       bucket: micropcf
-      regexp: /releases/Vagrantfile-v(.*)[.]base
+      regexp: releases/Vagrantfile-v(.*)[.]base
       access_key_id: {{aws-access-key-id}}
       secret_access_key: {{aws-secret-access-key}}
 
@@ -36,7 +36,7 @@ jobs:
       - get: cf-watch
         trigger: true
         passed: [unit-tests]
-      - get: base-vagrantfile-release
+      - get: vagrantfile
     - do:
       - task: deploy
         tags: [vsphere-linux-worker]
