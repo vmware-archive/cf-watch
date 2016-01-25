@@ -9,6 +9,7 @@ import (
 
 type File interface {
 	io.ReadCloser
+	Open() error
 	Basename() string
 	Children() []File
 	Mode() (os.FileMode, error)
@@ -27,6 +28,11 @@ func (t *Tree) New(path string) (File, error) {
 	fileInfo, err := osFile.Stat()
 	if err != nil {
 		return nil, err
+	}
+
+	err = osFile.Close()
+	if err != nil {
+		panic("whoa")
 	}
 
 	if fileInfo.IsDir() {
@@ -53,6 +59,15 @@ func (t *Tree) New(path string) (File, error) {
 type file struct {
 	*os.File
 	children []File
+}
+
+func (f *file) Open() error {
+	var err error
+	f.File, err = os.Open(f.Name())
+	if err != nil {
+		panic(err)
+	}
+	return err
 }
 
 func (f *file) Basename() string {

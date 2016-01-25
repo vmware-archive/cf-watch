@@ -10,7 +10,6 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 
-	"github.com/pivotal-cf/cf-watch/filetree"
 	. "github.com/pivotal-cf/cf-watch/scp"
 	"github.com/pivotal-cf/cf-watch/scp/mocks"
 )
@@ -83,13 +82,12 @@ var _ = Describe("Session", func() {
 	})
 
 	Describe("#Send", func() {
-		FIt("should create an empty directory", func(done Done) {
+		It("should create an empty directory", func(done Done) {
 			mockFile.EXPECT().Basename().Return("some-file")
-			mockFile.EXPECT().Children().Return([]filetree.File{})
+			// mockFile.EXPECT().Children().Return([]filetree.File{})
 			mockFile.EXPECT().Mode().Return(os.FileMode(0644), nil)
 			mockFile.EXPECT().Size().Return(int64(14), nil)
 			mockFile.EXPECT().Close().Return(nil)
-
 			mockFile.EXPECT().Read(gomock.Any()).Return(14, io.EOF).Do(func(buffer []byte) {
 				defer GinkgoRecover()
 
@@ -118,6 +116,8 @@ var _ = Describe("Session", func() {
 
 		Context("when the session is not connected", func() {
 			It("should return an error", func() {
+				mockFile.EXPECT().Close().Return(nil)
+
 				err := session.Send(mockFile)
 				Expect(err).To(MatchError("session closed"))
 			})
@@ -125,6 +125,8 @@ var _ = Describe("Session", func() {
 
 		Context("when the SSH session cannot be established", func() {
 			It("should return an error", func() {
+				mockFile.EXPECT().Close().Return(nil)
+
 				mockSSHServer.RejectSession = true
 
 				Expect(session.Connect(serverAddress, "some-valid-user", "some-valid-password")).To(Succeed())
@@ -137,6 +139,17 @@ var _ = Describe("Session", func() {
 
 		Context("when the remote scp command fails", func() {
 			It("should return an error", func(done Done) {
+				mockFile.EXPECT().Basename().Return("some-file")
+				mockFile.EXPECT().Mode().Return(os.FileMode(0644), nil)
+				mockFile.EXPECT().Size().Return(int64(14), nil)
+				mockFile.EXPECT().Close().Return(nil)
+				mockFile.EXPECT().Read(gomock.Any()).Return(14, io.EOF).Do(func(buffer []byte) {
+					defer GinkgoRecover()
+
+					_, err := bytes.NewBufferString("some-contents").Read(buffer)
+					Expect(err).NotTo(HaveOccurred())
+				})
+
 				mockSSHServer.CommandExitStatus = 1
 
 				go func() {

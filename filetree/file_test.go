@@ -89,16 +89,19 @@ var _ = Describe("FileTree", func() {
 
 	Describe("File", func() {
 		Describe("#Open", func() {
-			FIt("should open the file", func() {
+			It("should open the file", func() {
 				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))
 				Expect(err).NotTo(HaveOccurred())
 
-				_, err := ioutil.ReadAll(file)
-				Expect(err).To(MatchError("file closed"))
+				_, err = ioutil.ReadAll(file)
+				Expect(err).To(MatchError(ContainSubstring("bad file descriptor")))
 
 				Expect(file.Open()).To(Succeed())
 				defer file.Close()
-				Expect(ioutil.ReadAll(file)).To(Equal("some-content"))
+
+				contents, err := ioutil.ReadAll(file)
+				Expect(err).To(BeNil())
+				Expect(string(contents)).To(Equal("some-content"))
 			})
 		})
 
