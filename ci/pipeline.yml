@@ -3,21 +3,7 @@ resources:
     type: git
     source:
       uri: https://github.com/pivotal-cf/cf-watch.git
-      branch: wip-cf-watch
-  - name: executors
-    type: pool
-    source:
-      uri: git@github.com:pivotal-cf/micropcf-resource-pool
-      branch: master
-      pool: executors
-      private_key: {{github-ssh-key}}
-  - name: base-vagrantfile-release
-    type: s3
-    source:
-      bucket: micropcf
-      regexp: /releases/Vagrantfile-v(.*)[.]base
-      access_key_id: {{aws-access-key-id}}
-      secret_access_key: {{aws-secret-access-key}}
+      branch: wip-nanocf
 
 jobs:
   - name: unit-tests
@@ -29,35 +15,8 @@ jobs:
 
   - name: acceptance-tests
     plan:
-    - aggregate:
-      - put: executors
-        params:
-          acquire: true
-      - get: cf-watch
-        trigger: true
-        passed: [unit-tests]
-      - get: base-vagrantfile-release
-    - do:
-      - task: deploy
-        tags: [vsphere-linux-worker]
-        file: cf-watch/ci/tasks/deploy-vmware/task.yml
-        config:
-          params:
-            EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
-      - task: acceptance-tests
-        tags: [vsphere-linux-worker]
-        file: cf-watch/ci/tasks/acceptance-tests/task.yml
-        config:
-          params:
-            EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
-      ensure:
-        do:
-        - task: cleanup-deploy-local
-          tags: [vsphere-linux-worker]
-          file: cf-watch/ci/tasks/cleanup-deploy-local/task.yml
-          config:
-            params:
-              EXECUTOR_PRIVATE_KEY: {{executor-private-key}}
-        - put: executors
-          params:
-            release: executors
+    - get: cf-watch
+      trigger: true
+      passed: [unit-tests]
+    - task: acceptance-tests
+      file: cf-watch/ci/tasks/acceptance-tests/task.yml
