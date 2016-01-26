@@ -19,23 +19,13 @@ type File interface {
 type Tree struct{}
 
 func (t *Tree) New(path string) (File, error) {
-	osFile, err := os.Open(path)
+	closedFile, isDir, err := getClosedFile(path)
 	if err != nil {
 		return nil, err
 	}
 
 	var children []File
-	fileInfo, err := osFile.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	err = osFile.Close()
-	if err != nil {
-		panic("whoa")
-	}
-
-	if fileInfo.IsDir() {
+	if isDir {
 		childrenInfo, err := ioutil.ReadDir(path)
 		if err != nil {
 			return nil, err
@@ -51,9 +41,24 @@ func (t *Tree) New(path string) (File, error) {
 		}
 	}
 	return &file{
-		File:     osFile,
+		File:     closedFile,
 		children: children,
 	}, nil
+}
+
+func getClosedFile(path string) (closed *os.File, isDir bool, err error) {
+	osFile, err := os.Open(path)
+	if err != nil {
+		return nil, false, err
+	}
+	defer osFile.Close()
+
+	fileInfo, err := osFile.Stat()
+	if err != nil {
+		return nil, false, err
+	}
+
+	return osFile, fileInfo.IsDir(), nil
 }
 
 type file struct {
@@ -64,9 +69,6 @@ type file struct {
 func (f *file) Open() error {
 	var err error
 	f.File, err = os.Open(f.Name())
-	if err != nil {
-		panic(err)
-	}
 	return err
 }
 

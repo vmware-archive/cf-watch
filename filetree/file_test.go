@@ -99,9 +99,19 @@ var _ = Describe("FileTree", func() {
 				Expect(file.Open()).To(Succeed())
 				defer file.Close()
 
-				contents, err := ioutil.ReadAll(file)
-				Expect(err).To(BeNil())
-				Expect(string(contents)).To(Equal("some-content"))
+				Expect(ioutil.ReadAll(file)).To(Equal([]byte("some-content")))
+			})
+
+			Context("when the file cannot be opened", func() {
+				It("should return an error", func() {
+					file, err := tree.New(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))
+					Expect(err).NotTo(HaveOccurred())
+					Expect(os.Remove(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))).To(Succeed())
+
+					err = file.Open()
+					Expect(err).To(MatchError(ContainSubstring("no such file or directory")))
+				})
+
 			})
 		})
 
@@ -130,6 +140,9 @@ var _ = Describe("FileTree", func() {
 				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))
 				Expect(err).NotTo(HaveOccurred())
 
+				Expect(file.Open()).To(Succeed())
+				defer file.Close()
+
 				Expect(file.Mode()).To(Equal(os.FileMode(0644)))
 			})
 		})
@@ -138,6 +151,9 @@ var _ = Describe("FileTree", func() {
 			It("should return the size of the file", func() {
 				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))
 				Expect(err).NotTo(HaveOccurred())
+
+				Expect(file.Open()).To(Succeed())
+				defer file.Close()
 
 				Expect(file.Size()).To(Equal(int64(12)))
 			})
