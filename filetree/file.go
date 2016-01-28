@@ -14,6 +14,7 @@ type File interface {
 	Children() []File
 	Mode() (os.FileMode, error)
 	Size() (int64, error)
+	IsDir() (bool, error)
 }
 
 type Tree struct{}
@@ -86,6 +87,14 @@ func (f *file) Mode() (os.FileMode, error) {
 		return 0, err
 	}
 	return fileInfo.Mode(), nil
+}
+
+func (f *file) IsDir() (bool, error) {
+	fileInfo, err := f.Stat()
+	if err != nil {
+		return false, err
+	}
+	return fileInfo.IsDir(), nil
 }
 
 func (f *file) Size() (int64, error) {

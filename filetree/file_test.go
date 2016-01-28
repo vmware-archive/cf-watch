@@ -158,5 +158,25 @@ var _ = Describe("FileTree", func() {
 				Expect(file.Size()).To(Equal(int64(12)))
 			})
 		})
+		Describe("#IsDir", func() {
+			It("should return true if file is a directory", func() {
+				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir"))
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(file.Open()).To(Succeed())
+				defer file.Close()
+
+				Expect(file.IsDir()).To(BeTrue())
+			})
+			It("should return false if file is not a directory", func() {
+				file, err := tree.New(filepath.Join(tempDir, "some-parent-dir", "some-child-dir", "some-file"))
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(file.Open()).To(Succeed())
+				defer file.Close()
+
+				Expect(file.IsDir()).To(BeFalse())
+			})
+		})
 	})
 })

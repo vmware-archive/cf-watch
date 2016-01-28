@@ -61,9 +61,9 @@ var _ = Describe("CF Watch", func() {
 		Eventually(cf("delete-org", "-f", orgName), "10s").Should(gexec.Exit(0))
 	})
 
-	It("should write a `/tmp/watch` file to the app container", func() {
-		Eventually(cf("watch", "test-app", "fixtures/some-dir/some-nested-dir/some-file"), "2s").Should(gexec.Exit(0))
-		session := cf("ssh", "test-app", "-k", "-c", "cat /tmp/watch", "-i", "0")
+	It("should sync given directory and its contents to the app container", func() {
+		Eventually(cf("watch", "test-app", "fixtures/some-dir"), "2s").Should(gexec.Exit(0))
+		session := cf("ssh", "test-app", "-k", "-c", "cat /home/vcap/app/some-nested-dir/some-file", "-i", "0")
 		Eventually(session).Should(gexec.Exit(0))
 		Expect(session).To(gbytes.Say("some-text"))
 	})

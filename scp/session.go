@@ -49,7 +49,7 @@ func (s *Session) Close() error {
 	return nil
 }
 
-func (s *Session) Send(file File) error {
+func (s *Session) Send(file filetree.File) error {
 	defer file.Close()
 	if s.client == nil {
 		return errors.New("session closed")
@@ -70,21 +70,8 @@ func (s *Session) Send(file File) error {
 		}
 		defer stdin.Close()
 
-		mode, err := file.Mode()
-		if err != nil {
-			panic(err)
-		}
-		size, err := file.Size()
-		if err != nil {
-			panic(err)
-		}
+		s.sendFile(file, stdin)
 
-		fmt.Fprintf(stdin, "C%04o %d %s\n", mode, size, file.Basename())
-
-		if _, err := io.Copy(stdin, file); err != nil {
-			errChan <- err
-			return
-		}
 		if _, err := stdin.Write([]byte{0}); err != nil {
 			errChan <- err
 			return
@@ -94,7 +81,43 @@ func (s *Session) Send(file File) error {
 		if err := session.Run("/usr/bin/scp -tr /home/vcap"); err != nil {
 			errChan <- err
 		}
+
 		close(errChan)
 	}()
 	return <-errChan
+}
+
+func (s *Session) sendFile(file filetree.File, stdin io.WriteCloser) error {
+	defer file.Close()
+
+	mode, err := file.Mode()
+	if err != nil {
+		panic(err)
+	}
+
+	isDir, err := file.IsDir()
+
+	if err != nil {
+		panic(err)
+	}
+
+	if isDir {
+		fmt.Fprintf(stdin, "D%04o 0 %s\n", mode, file.Basename())
+		for _, child := range file.Children() {
+			s.sendFile(child, stdin)
+		}
+
+		fmt.Fprintf(stdin, "E\n")
+	} else {
+		//size, err := file.Size()
+		//if err != nil {
+		//panic(err)
+		//}
+		fmt.Fprintf(stdin, "C%04o %d %s\n", mode, 14, file.Basename())
+		if _, err := io.Copy(stdin, file); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

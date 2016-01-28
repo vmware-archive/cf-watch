@@ -60,6 +60,17 @@ func (_mr *_MockFileRecorder) Close() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Close")
 }
 
+func (_m *MockFile) IsDir() (bool, error) {
+	ret := _m.ctrl.Call(_m, "IsDir")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+func (_mr *_MockFileRecorder) IsDir() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "IsDir")
+}
+
 func (_m *MockFile) Mode() (os.FileMode, error) {
 	ret := _m.ctrl.Call(_m, "Mode")
 	ret0, _ := ret[0].(os.FileMode)
@@ -69,6 +80,16 @@ func (_m *MockFile) Mode() (os.FileMode, error) {
 
 func (_mr *_MockFileRecorder) Mode() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "Mode")
+}
+
+func (_m *MockFile) Open() error {
+	ret := _m.ctrl.Call(_m, "Open")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+func (_mr *_MockFileRecorder) Open() *gomock.Call {
+	return _mr.mock.ctrl.RecordCall(_mr.mock, "Open")
 }
 
 func (_m *MockFile) Read(_param0 []byte) (int, error) {
